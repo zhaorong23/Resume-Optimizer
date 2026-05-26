@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: [
+    "word-extractor",
+    "unpdf",
+    "tesseract.js",
+    "@napi-rs/canvas",
+  ],
 };
 
 export default nextConfig;

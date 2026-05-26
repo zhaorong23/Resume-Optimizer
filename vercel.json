@@ -1,0 +1,14 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "functions": {
+    "app/api/parse-resume/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/optimize/route.ts": {
+      "maxDuration": 120
+    }
+  }
+}
