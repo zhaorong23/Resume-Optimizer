@@ -6,7 +6,7 @@ function getConfig() {
   return getLlmConfig();
 }
 
-function extractJson(text: string): string {
+export function extractJson(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenced?.[1]) {
     return fenced[1].trim();
@@ -21,7 +21,7 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-async function callLlm(
+export async function callLlm(
   systemPrompt: string,
   userPrompt: string,
   temperature: number,

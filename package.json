@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test:prompt": "tsx scripts/test-prompt.ts",
     "compare:prompts": "tsx scripts/compare-prompts.ts",
-    "test:ocr": "tsx scripts/test-ocr.ts"
+    "test:ocr": "tsx scripts/test-ocr.ts",
+    "test:interview-prep": "tsx scripts/test-interview-prep.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",

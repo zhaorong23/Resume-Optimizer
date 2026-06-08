@@ -9,6 +9,9 @@
     },
     "app/api/optimize/route.ts": {
       "maxDuration": 120
+    },
+    "app/api/interview-prep/route.ts": {
+      "maxDuration": 120
     }
   }
 }
