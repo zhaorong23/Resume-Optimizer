@@ -10,7 +10,8 @@
     "test:prompt": "tsx scripts/test-prompt.ts",
     "compare:prompts": "tsx scripts/compare-prompts.ts",
     "test:ocr": "tsx scripts/test-ocr.ts",
-    "test:interview-prep": "tsx scripts/test-interview-prep.ts"
+    "test:interview-prep": "tsx scripts/test-interview-prep.ts",
+    "deploy:vercel": "bash scripts/deploy-vercel.sh"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",
