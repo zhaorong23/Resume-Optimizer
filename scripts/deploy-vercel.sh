@@ -9,6 +9,11 @@ if ! command -v vercel >/dev/null 2>&1; then
   npm install -g vercel@54.10.2
 fi
 
+if [[ ! -f "${ROOT}/.vercel/project.json" ]]; then
+  echo "Linking Vercel project..."
+  vercel link --yes
+fi
+
 if ! vercel whoami >/dev/null 2>&1; then
   echo "请先登录 Vercel（浏览器完成授权）..."
   vercel login
@@ -20,6 +25,13 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
+read_env() {
+  local key="$1"
+  local value
+  value="$(grep -E "^${key}=" "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+  printf '%s' "$value"
+}
+
 add_env() {
   local key="$1"
   local value="$2"
@@ -27,10 +39,15 @@ add_env() {
     printf '%s' "$value" | vercel env add "$key" production --force
 }
 
-# shellcheck disable=SC1090
-source <(grep -v '^#' "$ENV_FILE" | grep '=' | sed 's/^/export /')
-
+LLM_API_KEY="$(read_env LLM_API_KEY)"
 : "${LLM_API_KEY:?LLM_API_KEY missing in .env.local}"
+
+LLM_BASE_URL="$(read_env LLM_BASE_URL)"
+LLM_MODEL="$(read_env LLM_MODEL)"
+TAVILY_API_KEY="$(read_env TAVILY_API_KEY)"
+INTERVIEW_PREP_RATE_LIMIT="$(read_env INTERVIEW_PREP_RATE_LIMIT)"
+SEARCH_CACHE_TTL_SECONDS="$(read_env SEARCH_CACHE_TTL_SECONDS)"
+OCR_VISION_MODEL="$(read_env OCR_VISION_MODEL)"
 
 add_env LLM_API_KEY "$LLM_API_KEY"
 add_env LLM_BASE_URL "${LLM_BASE_URL:-https://api.siliconflow.cn}"
@@ -40,7 +57,7 @@ add_env OCR_ENABLED "true"
 add_env OCR_MAX_PAGES "5"
 add_env OCR_VISION_MODEL "${OCR_VISION_MODEL:-Pro/Qwen/Qwen2.5-VL-7B-Instruct}"
 
-if [[ -n "${TAVILY_API_KEY:-}" ]]; then
+if [[ -n "$TAVILY_API_KEY" ]]; then
   add_env TAVILY_API_KEY "$TAVILY_API_KEY"
 fi
 add_env INTERVIEW_PREP_RATE_LIMIT "${INTERVIEW_PREP_RATE_LIMIT:-3}"
