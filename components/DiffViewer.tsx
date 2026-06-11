@@ -17,19 +17,15 @@ export function DiffViewer({ sections }: DiffViewerProps) {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-lg bg-zinc-50 p-4">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  原文
-                </p>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">
+              <div className="rounded-lg bg-surface p-4">
+                <p className="section-label mb-2">原文</p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted">
                   {section.original}
                 </p>
               </div>
-              <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-4">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-indigo-600">
-                  改写
-                </p>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-800">
+              <div className="rounded-md border border-primary-border bg-primary-soft p-4">
+                <p className="section-label mb-2 text-primary-muted">改写建议</p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                   {section.rewritten}
                 </p>
               </div>

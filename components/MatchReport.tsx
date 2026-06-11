@@ -22,14 +22,14 @@ export function MatchReportCard({ report }: MatchReportProps) {
           <span>匹配报告</span>
           <span className={`text-2xl font-bold ${scoreColor}`}>
             {report.matchScore}
-            <span className="text-base font-normal text-zinc-500"> / 100</span>
+            <span className="text-base font-normal text-muted"> / 100</span>
           </span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4 text-sm text-zinc-700">
+      <CardContent className="space-y-4 text-sm text-muted">
         <ReportSection title="已匹配优势" items={report.matched} color="emerald" />
         <ReportSection title="待补缺口" items={report.gaps} color="rose" />
-        <ReportSection title="改进建议" items={report.suggestions} color="indigo" />
+        <ReportSection title="改进建议" items={report.suggestions} color="primary" />
       </CardContent>
     </Card>
   );
@@ -42,17 +42,17 @@ function ReportSection({
 }: {
   title: string;
   items: string[];
-  color: "emerald" | "rose" | "indigo";
+  color: "emerald" | "rose" | "primary";
 }) {
   const dotColor = {
-    emerald: "bg-emerald-500",
-    rose: "bg-rose-500",
-    indigo: "bg-indigo-500",
+    emerald: "bg-success",
+    rose: "bg-destructive",
+    primary: "bg-primary",
   }[color];
 
   return (
     <div>
-      <p className="mb-2 font-medium text-zinc-900">{title}</p>
+      <p className="mb-2 font-medium text-foreground">{title}</p>
       <ul className="space-y-2">
         {items.map((item) => (
           <li key={item} className="flex gap-2">

@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI 简历优化 | 根据 JD 智能改写简历",
+  title: "AI 简历优化与面试准备",
   description:
-    "粘贴简历与目标岗位 JD，获取 JD 解读、匹配分析与 AI 定向改写建议",
+    "面向产品经理 & 产品运营求职者（含校招/实习）的 JD 驱动简历优化与面试准备工具。支持 PDF / Word / 扫描件输入。",
 };
 
 export default function RootLayout({

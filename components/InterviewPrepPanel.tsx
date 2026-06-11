@@ -5,13 +5,19 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InterviewPrepExportBar } from "@/components/InterviewPrepExportBar";
 import { formatMatchLevel } from "@/lib/interview-prep/format";
-import type { InterviewPrepResult } from "@/lib/interview-prep/schema";
+import {
+  getRoleTrackLabel,
+  type PmFlavor,
+} from "@/lib/interview-prep/infer-role-type";
+import type { InterviewPrepResult, RoleType } from "@/lib/interview-prep/schema";
 import { cn } from "@/lib/utils";
 
 type InterviewPrepPanelProps = {
   result: InterviewPrepResult;
   companyName: string;
   roleTitle?: string;
+  roleType?: RoleType;
+  pmFlavor?: PmFlavor;
 };
 
 type SectionProps = {
@@ -34,11 +40,11 @@ function CollapsibleSection({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between px-6 py-4 text-left"
       >
-        <span className="font-semibold text-zinc-900">{title}</span>
+        <span className="font-semibold text-foreground">{title}</span>
         {open ? (
-          <ChevronDown className="h-4 w-4 text-zinc-500" />
+          <ChevronDown className="h-4 w-4 text-muted" />
         ) : (
-          <ChevronRight className="h-4 w-4 text-zinc-500" />
+          <ChevronRight className="h-4 w-4 text-muted" />
         )}
       </button>
       {open && <CardContent className="border-t pt-4">{children}</CardContent>}
@@ -50,15 +56,20 @@ export function InterviewPrepPanel({
   result,
   companyName,
   roleTitle,
+  roleType = "pm",
+  pmFlavor,
 }: InterviewPrepPanelProps) {
+  const trackLabel = getRoleTrackLabel(roleType, pmFlavor);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-zinc-900">面试准备</h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <h2 className="text-2xl font-bold text-foreground">面试准备</h2>
+          <p className="mt-1 text-sm text-muted">
             {companyName}
-            {roleTitle ? ` · ${roleTitle}` : ""} · {result.mode} 模式
+            {roleTitle ? ` · ${roleTitle}` : ""} · 求职赛道：{trackLabel} ·{" "}
+            {result.mode} 模式
             {result.searchFailed ? " · 联网调研已降级" : ""}
           </p>
         </div>
@@ -87,19 +98,19 @@ export function InterviewPrepPanel({
       )}
 
       <CollapsibleSection title="三、定制自我介绍" defaultOpen>
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted">
           {result.selfIntro}
         </p>
       </CollapsibleSection>
 
       <CollapsibleSection title="一、公司与产品调研">
-        <div className="space-y-3 text-sm text-zinc-700">
+        <div className="space-y-3 text-sm text-muted">
           <p>{result.companyResearch.overview}</p>
-          <p className="font-medium text-zinc-900">面经风格</p>
+          <p className="font-medium text-foreground">面经风格</p>
           <p>{result.companyResearch.interviewStyle}</p>
           {result.companyResearch.competitors.length > 0 && (
             <>
-              <p className="font-medium text-zinc-900">竞品格局</p>
+              <p className="font-medium text-foreground">竞品格局</p>
               <ul className="list-disc space-y-1 pl-5">
                 {result.companyResearch.competitors.map((item) => (
                   <li key={item.name}>
@@ -113,12 +124,12 @@ export function InterviewPrepPanel({
       </CollapsibleSection>
 
       <CollapsibleSection title="二、JD 深度解读与匹配">
-        <div className="space-y-4 text-sm text-zinc-700">
+        <div className="space-y-4 text-sm text-muted">
           <p>{result.jdIntent}</p>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-left text-xs">
               <thead>
-                <tr className="border-b border-zinc-200 text-zinc-500">
+                <tr className="border-b border-border text-muted">
                   <th className="py-2 pr-3">JD 要求</th>
                   <th className="py-2 pr-3">简历依据</th>
                   <th className="py-2 pr-3">匹配</th>
@@ -149,10 +160,10 @@ export function InterviewPrepPanel({
         <div className="space-y-6">
           {result.projectDeepDives.map((project) => (
             <div key={project.projectName} className="space-y-2 text-sm">
-              <h4 className="font-semibold text-zinc-900">
+              <h4 className="font-semibold text-foreground">
                 {project.projectName}
               </h4>
-              <ul className="space-y-1 text-zinc-700">
+              <ul className="space-y-1 text-muted">
                 <li>
                   <strong>情境</strong>：{project.star.situation}
                 </li>
@@ -170,7 +181,7 @@ export function InterviewPrepPanel({
                 <div className="mt-2 space-y-2 rounded-lg bg-zinc-50 p-3">
                   {project.followUps.map((item) => (
                     <div key={item.question}>
-                      <p className="font-medium text-zinc-900">
+                      <p className="font-medium text-foreground">
                         Q：{item.question}
                       </p>
                       <p className="text-zinc-600">A：{item.answer}</p>
@@ -187,19 +198,19 @@ export function InterviewPrepPanel({
         <div className="space-y-4">
           {result.commonQuestions.map((q) => (
             <div key={q.question} className="text-sm">
-              <p className="font-medium text-zinc-900">{q.question}</p>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="font-medium text-foreground">{q.question}</p>
+              <p className="mt-1 text-xs text-muted">
                 来源：{q.source}
                 {q.examiningPoint ? ` · ${q.examiningPoint}` : ""}
               </p>
-              <p className="mt-1 text-zinc-700">{q.referenceAnswer}</p>
+              <p className="mt-1 text-muted">{q.referenceAnswer}</p>
             </div>
           ))}
         </div>
       </CollapsibleSection>
 
       <CollapsibleSection title="六、产品设计思考">
-        <div className="space-y-3 text-sm text-zinc-700">
+        <div className="space-y-3 text-sm text-muted">
           {result.designObservations.highlights.map((item) => (
             <p key={item.observation}>
               <strong>{item.observation}</strong> — {item.judgment}
@@ -212,7 +223,7 @@ export function InterviewPrepPanel({
       </CollapsibleSection>
 
       <CollapsibleSection title="七、反问清单">
-        <ol className="list-decimal space-y-2 pl-5 text-sm text-zinc-700">
+        <ol className="list-decimal space-y-2 pl-5 text-sm text-muted">
           {result.reverseQuestions.map((item) => (
             <li key={item}>{item}</li>
           ))}
@@ -243,8 +254,8 @@ function GapGroup({
   if (items.length === 0) return null;
   return (
     <div className="mb-4">
-      <p className={cn("mb-2 text-sm font-medium text-zinc-900")}>{title}</p>
-      <ul className="space-y-1 text-sm text-zinc-700">
+      <p className={cn("mb-2 text-sm font-medium text-foreground")}>{title}</p>
+      <ul className="space-y-1 text-sm text-muted">
         {items.map((item) => (
           <li key={item.content}>
             • {item.content} → {item.action}
