@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EvidenceBoundaryBadge } from "@/components/EvidenceBoundaryBadge";
 import { InterviewPrepExportBar } from "@/components/InterviewPrepExportBar";
 import { formatMatchLevel } from "@/lib/interview-prep/format";
 import {
   getRoleTrackLabel,
   type PmFlavor,
 } from "@/lib/interview-prep/infer-role-type";
-import type { InterviewPrepResult, RoleType } from "@/lib/interview-prep/schema";
+import type { GapItem, InterviewPrepResult, RoleType } from "@/lib/interview-prep/schema";
 import { cn } from "@/lib/utils";
 
 type InterviewPrepPanelProps = {
@@ -89,8 +90,13 @@ export function InterviewPrepPanel({
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-amber-900">
             {result.gapChecklist.priority1.map((item) => (
-              <p key={item.content}>
-                • {item.content} → {item.action}
+              <p key={item.content} className="flex flex-wrap items-center gap-2">
+                <span>
+                  • {item.content} → {item.action}
+                </span>
+                {item.evidenceBoundary ? (
+                  <EvidenceBoundaryBadge boundary={item.evidenceBoundary} />
+                ) : null}
               </p>
             ))}
           </CardContent>
@@ -133,6 +139,7 @@ export function InterviewPrepPanel({
                   <th className="py-2 pr-3">JD 要求</th>
                   <th className="py-2 pr-3">简历依据</th>
                   <th className="py-2 pr-3">匹配</th>
+                  <th className="py-2 pr-3">证据边界</th>
                   <th className="py-2">面试策略</th>
                 </tr>
               </thead>
@@ -146,6 +153,13 @@ export function InterviewPrepPanel({
                     <td className="py-2 pr-3">{row.resumeEvidence}</td>
                     <td className="py-2 pr-3">
                       {formatMatchLevel(row.matchLevel)}
+                    </td>
+                    <td className="py-2 pr-3">
+                      {row.evidenceBoundary ? (
+                        <EvidenceBoundaryBadge boundary={row.evidenceBoundary} />
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="py-2">{row.interviewStrategy}</td>
                   </tr>
@@ -203,7 +217,28 @@ export function InterviewPrepPanel({
                 来源：{q.source}
                 {q.examiningPoint ? ` · ${q.examiningPoint}` : ""}
               </p>
-              <p className="mt-1 text-muted">{q.referenceAnswer}</p>
+              {q.passAnswer || q.strongAnswer ? (
+                <div className="mt-2 space-y-2">
+                  {q.passAnswer ? (
+                    <p className="text-muted">
+                      <span className="font-medium text-foreground">
+                        及格答法：
+                      </span>
+                      {q.passAnswer}
+                    </p>
+                  ) : null}
+                  {q.strongAnswer ? (
+                    <p className="text-muted">
+                      <span className="font-medium text-foreground">
+                        加分答法：
+                      </span>
+                      {q.strongAnswer}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="mt-1 text-muted">{q.referenceAnswer}</p>
+              )}
             </div>
           ))}
         </div>
@@ -249,16 +284,21 @@ function GapGroup({
   items,
 }: {
   title: string;
-  items: { content: string; action: string }[];
+  items: GapItem[];
 }) {
   if (items.length === 0) return null;
   return (
     <div className="mb-4">
       <p className={cn("mb-2 text-sm font-medium text-foreground")}>{title}</p>
-      <ul className="space-y-1 text-sm text-muted">
+      <ul className="space-y-2 text-sm text-muted">
         {items.map((item) => (
-          <li key={item.content}>
-            • {item.content} → {item.action}
+          <li key={item.content} className="flex flex-wrap items-center gap-2">
+            <span>
+              • {item.content} → {item.action}
+            </span>
+            {item.evidenceBoundary ? (
+              <EvidenceBoundaryBadge boundary={item.evidenceBoundary} />
+            ) : null}
           </li>
         ))}
       </ul>

@@ -11,7 +11,13 @@
     "compare:prompts": "tsx scripts/compare-prompts.ts",
     "test:ocr": "tsx scripts/test-ocr.ts",
     "test:interview-prep": "tsx scripts/test-interview-prep.ts",
-    "deploy:vercel": "bash scripts/deploy-vercel.sh"
+    "test:deterministic": "tsx scripts/test-deterministic.ts",
+    "measure:fabrication": "tsx scripts/measure-fabrication.ts",
+    "measure:fabrication:weak": "tsx scripts/measure-fabrication.ts -- --weak-smoke",
+    "eval:generate": "tsx scripts/batch-eval-generate.ts",
+    "eval:judge": "tsx scripts/eval-llm-judge.ts",
+    "deploy:vercel": "bash scripts/deploy-vercel.sh",
+    "demo:public": "bash scripts/start-public-demo.sh"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",

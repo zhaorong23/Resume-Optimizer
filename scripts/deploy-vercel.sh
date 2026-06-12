@@ -50,6 +50,8 @@ SEARCH_CACHE_TTL_SECONDS="$(read_env SEARCH_CACHE_TTL_SECONDS)"
 OCR_VISION_MODEL="$(read_env OCR_VISION_MODEL)"
 
 add_env LLM_API_KEY "$LLM_API_KEY"
+add_env NEXT_PUBLIC_PORTFOLIO_URL "${NEXT_PUBLIC_PORTFOLIO_URL:-https://www.resume-optimization.top}"
+add_env NEXT_PUBLIC_APP_URL "${NEXT_PUBLIC_APP_URL:-https://app.resume-optimization.top}"
 add_env LLM_BASE_URL "${LLM_BASE_URL:-https://api.siliconflow.cn}"
 add_env LLM_MODEL "${LLM_MODEL:-deepseek-ai/DeepSeek-V3}"
 add_env OCR_PROVIDER "cloud"
@@ -60,7 +62,7 @@ add_env OCR_VISION_MODEL "${OCR_VISION_MODEL:-Pro/Qwen/Qwen2.5-VL-7B-Instruct}"
 if [[ -n "$TAVILY_API_KEY" ]]; then
   add_env TAVILY_API_KEY "$TAVILY_API_KEY"
 fi
-add_env INTERVIEW_PREP_RATE_LIMIT "${INTERVIEW_PREP_RATE_LIMIT:-3}"
+add_env INTERVIEW_PREP_RATE_LIMIT "${INTERVIEW_PREP_RATE_LIMIT:-0}"
 add_env SEARCH_CACHE_TTL_SECONDS "${SEARCH_CACHE_TTL_SECONDS:-86400}"
 
 echo "Deploying to production..."

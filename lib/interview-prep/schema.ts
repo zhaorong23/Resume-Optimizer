@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { evidenceBoundarySchema } from "@/lib/evidence-boundary";
 import { optimizeResultSchema } from "@/lib/schema";
 
-export const roleTypeSchema = z.enum(["pm", "growth", "ops", "biz"]);
+export const roleTypeSchema = z.enum(["pm", "ops"]);
 export const interviewRoundSchema = z.enum(["hr", "biz", "final", "all"]);
 export const prepModeSchema = z.enum(["quick", "standard", "deep"]);
 export const prepModuleSchema = z.enum([
@@ -43,6 +44,7 @@ export const jdLineMatchSchema = z.object({
   jdRequirement: z.string(),
   resumeEvidence: z.string(),
   matchLevel: z.enum(["strong", "medium", "weak", "unknown"]),
+  evidenceBoundary: evidenceBoundarySchema.optional(),
   gapOrRisk: z.string(),
   interviewStrategy: z.string(),
 });
@@ -66,6 +68,8 @@ export const projectDeepDiveSchema = z.object({
 export const interviewQuestionSchema = z.object({
   question: z.string(),
   referenceAnswer: z.string(),
+  passAnswer: z.string().optional(),
+  strongAnswer: z.string().optional(),
   source: z.enum(["面经", "专项", "通用"]),
   examiningPoint: z.string().optional(),
 });
@@ -73,6 +77,7 @@ export const interviewQuestionSchema = z.object({
 export const gapItemSchema = z.object({
   content: z.string(),
   action: z.string(),
+  evidenceBoundary: evidenceBoundarySchema.optional(),
 });
 
 export const interviewPrepResultSchema = z.object({

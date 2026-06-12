@@ -1,5 +1,6 @@
 "use client";
 
+import { EvidenceBoundaryBadge } from "@/components/EvidenceBoundaryBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { MatchReport } from "@/lib/schema";
 
@@ -28,7 +29,29 @@ export function MatchReportCard({ report }: MatchReportProps) {
       </CardHeader>
       <CardContent className="space-y-4 text-sm text-muted">
         <ReportSection title="已匹配优势" items={report.matched} color="emerald" />
-        <ReportSection title="待补缺口" items={report.gaps} color="rose" />
+        {report.gapDetails && report.gapDetails.length > 0 ? (
+          <div>
+            <p className="mb-2 font-medium text-foreground">待补缺口</p>
+            <ul className="space-y-2">
+              {report.gapDetails.map((gap) => (
+                <li key={gap.content} className="flex gap-2">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span>{gap.content}</span>
+                      <EvidenceBoundaryBadge boundary={gap.evidenceBoundary} />
+                    </div>
+                    {gap.suggestion ? (
+                      <p className="text-xs text-muted">{gap.suggestion}</p>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <ReportSection title="待补缺口" items={report.gaps} color="rose" />
+        )}
         <ReportSection title="改进建议" items={report.suggestions} color="primary" />
       </CardContent>
     </Card>

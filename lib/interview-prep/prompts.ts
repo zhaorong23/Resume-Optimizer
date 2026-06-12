@@ -1,14 +1,21 @@
 import { readFileSync } from "fs";
 import { join } from "path";
+import { TRUTH_BOUNDARY_PROMPT_RULE } from "@/lib/evidence-boundary";
 import type { OptimizeResult } from "@/lib/schema";
+import type { PmFlavor } from "./infer-role-type";
 import type { PrepMode, PrepModule, RoleType } from "./schema";
 
 const ROLE_TYPE_LABELS: Record<RoleType, string> = {
   pm: "产品经理（PM）",
-  growth: "增长 / 数据产品",
   ops: "产品运营",
-  biz: "商业策略 / BD",
 };
+
+const SECTION_HEADERS = {
+  pm: "## A：产品经理（PM）",
+  growth: "## B：PM 增长方向（子集）",
+  ops: "## C：产品运营",
+  general: "## 通用动机类",
+} as const;
 
 const INTERVIEW_PREP_JSON_SCHEMA = `{
   "jdOriginal": "JD 原文",
@@ -27,6 +34,7 @@ const INTERVIEW_PREP_JSON_SCHEMA = `{
     "jdRequirement": "JD 要求",
     "resumeEvidence": "简历依据；无则写「简历未见直接证据」",
     "matchLevel": "strong|medium|weak|unknown",
+    "evidenceBoundary": "可以写|谨慎写|不能写",
     "gapOrRisk": "缺口或风险",
     "interviewStrategy": "面试策略"
   }],
@@ -39,6 +47,8 @@ const INTERVIEW_PREP_JSON_SCHEMA = `{
   "commonQuestions": [{
     "question": "题目",
     "referenceAnswer": "参考回答要点",
+    "passAnswer": "及格答法（可选，至少2道核心题必填）",
+    "strongAnswer": "加分答法（可选，至少2道核心题必填）",
     "source": "面经|专项|通用",
     "examiningPoint": "考察点"
   }],
@@ -48,9 +58,9 @@ const INTERVIEW_PREP_JSON_SCHEMA = `{
   },
   "reverseQuestions": ["反问 5-8 条"],
   "gapChecklist": {
-    "priority1": [{ "content": "gap", "action": "补课方式" }],
-    "priority2": [{ "content": "gap", "action": "补课方式" }],
-    "priority3": [{ "content": "gap", "action": "补课方式" }]
+    "priority1": [{ "content": "gap", "action": "补课方式", "evidenceBoundary": "可以写|谨慎写|不能写" }],
+    "priority2": [{ "content": "gap", "action": "补课方式", "evidenceBoundary": "可以写|谨慎写|不能写" }],
+    "priority3": [{ "content": "gap", "action": "补课方式", "evidenceBoundary": "可以写|谨慎写|不能写" }]
   },
   "sources": [{ "title": "来源标题", "url": "真实URL" }],
   "mode": "quick|standard|deep",
@@ -65,29 +75,44 @@ const RESEARCH_BRIEF_SCHEMA = `{
   "competitorNames": ["主要竞品"]
 }`;
 
-function loadRoleTypesExcerpt(roleType: RoleType = "pm"): string {
+function extractSection(content: string, header: string): string {
+  const start = content.indexOf(header);
+  if (start === -1) return "";
+
+  const nextHeader = content.indexOf("\n## ", start + header.length);
+  return content
+    .slice(start, nextHeader === -1 ? undefined : nextHeader)
+    .trim();
+}
+
+export function loadRoleTypesExcerpt(
+  roleType: RoleType = "pm",
+  pmFlavor: PmFlavor = "general",
+): string {
   try {
     const filePath = join(
       process.cwd(),
       "lib/interview-prep/references/role-types.md",
     );
     const content = readFileSync(filePath, "utf-8");
-    const sectionMap: Record<RoleType, string> = {
-      pm: "## A：产品经理（PM）",
-      growth: "## B：增长 / 数据产品",
-      ops: "## C：产品运营",
-      biz: "## D：商业策略 / BD",
-    };
-    const start = content.indexOf(sectionMap[roleType]);
-    const generalStart = content.indexOf("## 通用动机类");
-    if (start === -1) return "";
-    const roleSection = content.slice(
-      start,
-      generalStart > start ? generalStart : undefined,
-    );
-    const generalSection =
-      generalStart !== -1 ? content.slice(generalStart) : "";
-    return `${roleSection}\n\n${generalSection}`.trim();
+    const sections: string[] = [];
+
+    if (roleType === "pm") {
+      const pmSection = extractSection(content, SECTION_HEADERS.pm);
+      if (pmSection) sections.push(pmSection);
+      if (pmFlavor === "growth") {
+        const growthSection = extractSection(content, SECTION_HEADERS.growth);
+        if (growthSection) sections.push(growthSection);
+      }
+    } else {
+      const opsSection = extractSection(content, SECTION_HEADERS.ops);
+      if (opsSection) sections.push(opsSection);
+    }
+
+    const generalSection = extractSection(content, SECTION_HEADERS.general);
+    if (generalSection) sections.push(generalSection);
+
+    return sections.join("\n\n").trim();
   } catch {
     return "";
   }
@@ -140,9 +165,10 @@ export function buildInterviewPrepSystemPrompt(
   mode: PrepMode,
   roleType: RoleType = "pm",
   modules?: PrepModule[],
+  pmFlavor: PmFlavor = "general",
 ): string {
   const counts = getModeQuestionCounts(mode);
-  const roleExcerpt = loadRoleTypesExcerpt(roleType);
+  const roleExcerpt = loadRoleTypesExcerpt(roleType, pmFlavor);
   const moduleNote =
     modules && modules.length > 0
       ? `\n仅生成以下模块相关内容，其余字段可填简短占位或空数组：${modules.join(", ")}`
@@ -158,7 +184,11 @@ export function buildInterviewPrepSystemPrompt(
 5. 项目深挖 ${counts.projectCount} 个，每个含完整 STAR + 2-3 条追问预案
 6. 高频题约 ${counts.questionCount} 条：面经题 + 岗位专项题（来源标注 面经/专项/通用）
 7. 反问 ${counts.reverseCount} 条，覆盖产品方向、团队、成长、决策文化
-8. Gap 清单分 priority1/2/3，每项含具体补课行动
+8. Gap 清单分 priority1/2/3，每项含具体补课行动，并标注 evidenceBoundary（可以写/谨慎写/不能写）
+9. jdLineMatches 每行须含 evidenceBoundary，与 matchLevel 一致（strong→可以写，medium→谨慎写，weak/unknown 且无证据→不能写）
+10. 至少 2 道与 JD/简历最相关的高频题须填写 passAnswer（及格答法）与 strongAnswer（加分答法）；其余题可仅 referenceAnswer
+
+${TRUTH_BOUNDARY_PROMPT_RULE}
 
 ${mode === "quick" ? "速准版：竞品可简写，hotTopics 可 2-3 条。" : ""}
 ${mode === "deep" ? "深研版：竞品对比要详细，反问 10 条，延伸阅读写入 hotTopics。" : ""}

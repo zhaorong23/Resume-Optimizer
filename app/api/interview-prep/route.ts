@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateInterviewPrep } from "@/lib/interview-prep/generate";
 import { interviewPrepRequestSchema } from "@/lib/interview-prep/schema";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, getDailyLimit } from "@/lib/rate-limit";
 
 export const maxDuration = 120;
 
@@ -18,9 +18,12 @@ export async function POST(request: NextRequest) {
     const ip = getClientIp(request);
     const { allowed, remaining } = checkRateLimit(ip, "interview-prep");
 
-    if (!allowed) {
+    const dailyLimit = getDailyLimit("interview-prep");
+    if (!allowed && dailyLimit > 0) {
       return NextResponse.json(
-        { error: "今日面试准备次数已达上限（3 次），请明天再试" },
+        {
+          error: `今日面试准备次数已达上限（${dailyLimit} 次），请明天再试`,
+        },
         { status: 429 },
       );
     }

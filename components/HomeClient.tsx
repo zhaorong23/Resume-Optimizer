@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { ResumeInput, type InterviewMeta } from "@/components/ResumeInput";
 import { JdAnalysisCard } from "@/components/JdAnalysisCard";
 import { MatchReportCard } from "@/components/MatchReport";
+import { EvidenceAuditAlert } from "@/components/EvidenceAuditAlert";
 import { DiffViewer } from "@/components/DiffViewer";
 import { ExportBar } from "@/components/ExportBar";
 import { InterviewPrepPanel } from "@/components/InterviewPrepPanel";
@@ -13,16 +14,16 @@ import { listPromptVariants } from "@/lib/prompts";
 import { inferPmFlavor } from "@/lib/interview-prep/infer-role-type";
 import type { InterviewPrepResult } from "@/lib/interview-prep/schema";
 import type { OptimizeResult } from "@/lib/schema";
+import { PORTFOLIO_URL } from "@/lib/site-urls";
 import { cn } from "@/lib/utils";
 
 const PROMPT_VARIANTS = listPromptVariants();
 
-const OPTIMIZE_STEPS = [
-  "分析 JD 要求",
-  "解析简历内容",
-  "计算岗位匹配度",
-  "生成定向改写",
-];
+const OPTIMIZE_STEP_LABELS: Record<string, string> = {
+  analyze: "解读 JD 与计算匹配度",
+  rewrite: "生成定向改写",
+  audit: "可信度检查",
+};
 
 const INTERVIEW_STEPS: Record<string, string> = {
   research: "正在调研公司与面经",
@@ -52,7 +53,7 @@ export function HomeClient() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("optimize");
 
   const [optimizeLoading, setOptimizeLoading] = useState(false);
-  const [optimizeStepIndex, setOptimizeStepIndex] = useState(0);
+  const [optimizeStep, setOptimizeStep] = useState("analyze");
   const [optimizeError, setOptimizeError] = useState<string | null>(null);
   const [optimizeResult, setOptimizeResult] = useState<OptimizeResult | null>(
     null,
@@ -68,13 +69,7 @@ export function HomeClient() {
     setOptimizeLoading(true);
     setOptimizeError(null);
     setOptimizeResult(null);
-    setOptimizeStepIndex(0);
-
-    const interval = setInterval(() => {
-      setOptimizeStepIndex((prev) =>
-        prev < OPTIMIZE_STEPS.length - 1 ? prev + 1 : prev,
-      );
-    }, 1500);
+    setOptimizeStep("analyze");
 
     try {
       const response = await fetch("/api/optimize", {
@@ -85,21 +80,60 @@ export function HomeClient() {
           jd,
           focus: focus || undefined,
           promptVariant,
+          stream: true,
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
+        const data = await response.json();
         throw new Error(data.error ?? "优化失败，请稍后重试");
       }
 
-      setOptimizeResult(data as OptimizeResult);
-      setActiveTab("optimize");
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("无法读取响应流");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalResult: OptimizeResult | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data: ")) continue;
+          const payload = JSON.parse(line.slice(6)) as {
+            type: string;
+            step?: string;
+            message?: string;
+            data?: OptimizeResult;
+          };
+
+          if (payload.type === "progress" && payload.step) {
+            setOptimizeStep(payload.step);
+          } else if (payload.type === "result" && payload.data) {
+            finalResult = payload.data;
+            setOptimizeResult(payload.data);
+            setActiveTab("optimize");
+          } else if (payload.type === "error") {
+            throw new Error(payload.message ?? "优化失败，请稍后重试");
+          }
+        }
+      }
+
+      if (!finalResult) {
+        throw new Error("未收到优化结果，请重试");
+      }
     } catch (err) {
       setOptimizeError(err instanceof Error ? err.message : "优化失败，请稍后重试");
     } finally {
-      clearInterval(interval);
       setOptimizeLoading(false);
     }
   }
@@ -209,7 +243,7 @@ export function HomeClient() {
             </div>
           </div>
           <a
-            href="https://zhaorong-portfolio.vercel.app"
+            href={PORTFOLIO_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-muted transition-colors hover:text-primary"
@@ -291,7 +325,7 @@ export function HomeClient() {
               {optimizeLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {OPTIMIZE_STEPS[optimizeStepIndex]}
+                  {OPTIMIZE_STEP_LABELS[optimizeStep] ?? "正在优化"}
                 </>
               ) : (
                 "开始优化简历"
@@ -387,6 +421,10 @@ export function HomeClient() {
                   <MatchReportCard report={optimizeResult.matchReport} />
                 </div>
 
+                {optimizeResult.evidenceAudit ? (
+                  <EvidenceAuditAlert audit={optimizeResult.evidenceAudit} />
+                ) : null}
+
                 <div>
                   <h3 className="mb-4 text-base font-semibold text-foreground">
                     改写对比
@@ -421,7 +459,7 @@ export function HomeClient() {
         <p>
           由{" "}
           <a
-            href="https://zhaorong-portfolio.vercel.app"
+            href={PORTFOLIO_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary hover:underline"

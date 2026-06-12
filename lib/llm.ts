@@ -1,6 +1,25 @@
-import { getPromptVariant } from "./prompts";
-import { getLlmConfig } from "./llm-config";
-import { optimizeResultSchema, type OptimizeResult } from "./schema";
+import {
+  buildAnalyzeSystemPrompt,
+  buildAnalyzeUserPrompt,
+  buildRewriteSystemPrompt,
+  buildRewriteUserPrompt,
+  getPromptVariant,
+} from "./prompts";
+import { getLlmConfig, type LlmConfig } from "./llm-config";
+import {
+  auditOptimizeEvidence,
+  buildRewriteFabricationCorrectionPrompt,
+  fabricationSeverity,
+} from "./evidence-audit";
+import { applySanitizeIfNeeded } from "./evidence-sanitize";
+import {
+  optimizeAnalyzeSchema,
+  optimizeRewriteSchema,
+  type OptimizeAnalyzeResult,
+  type OptimizeResult,
+  type OptimizeRewriteResult,
+} from "./schema";
+import type { z } from "zod";
 
 function getConfig() {
   return getLlmConfig();
@@ -25,8 +44,9 @@ export async function callLlm(
   systemPrompt: string,
   userPrompt: string,
   temperature: number,
+  config?: LlmConfig,
 ): Promise<string> {
-  const { apiKey, baseUrl, model } = getConfig();
+  const { apiKey, baseUrl, model } = config ?? getConfig();
   const url = `${baseUrl.replace(/\/$/, "")}/v1/chat/completions`;
 
   const response = await fetch(url, {
@@ -66,36 +86,190 @@ export async function callLlm(
 export type OptimizeOptions = {
   focus?: string;
   promptVariant?: string;
+  onProgress?: (step: OptimizeProgressStep) => void;
 };
+
+export type OptimizeProgressStep = "analyze" | "rewrite" | "audit";
+
+export type OptimizeProgressEvent =
+  | { type: "progress"; step: OptimizeProgressStep; message: string }
+  | { type: "result"; data: OptimizeResult }
+  | { type: "error"; message: string };
+
+async function parseFromLlm<T>(
+  schema: z.ZodType<T>,
+  systemPrompt: string,
+  userPrompt: string,
+  temperature: number,
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const raw = await callLlm(
+        systemPrompt,
+        attempt === 0
+          ? userPrompt
+          : `${userPrompt}\n\n上次返回的 JSON 格式有误，请严格输出合法 JSON，不要包含任何额外文字。`,
+        temperature,
+      );
+      const parsed = JSON.parse(extractJson(raw));
+      return schema.parse(parsed);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  throw lastError ?? new Error("JSON 解析失败");
+}
+
+function mergeOptimizeResult(
+  analyze: OptimizeAnalyzeResult,
+  rewrite: OptimizeRewriteResult,
+): OptimizeResult {
+  return {
+    jdAnalysis: analyze.jdAnalysis,
+    matchReport: analyze.matchReport,
+    sections: rewrite.sections,
+    disclaimer:
+      rewrite.disclaimer ||
+      analyze.disclaimer ||
+      "改写仅重组你提供的内容；含 [待补充] 处需你本人填写真实数据",
+  };
+}
+
+const PROGRESS_MESSAGES: Record<OptimizeProgressStep, string> = {
+  analyze: "解读 JD 与计算匹配度",
+  rewrite: "生成定向改写",
+  audit: "可信度检查",
+};
+
+async function runRewriteWithRetry(
+  resume: string,
+  jd: string,
+  analyze: OptimizeAnalyzeResult,
+  variantId: string,
+  temperature: number,
+  focus?: string,
+): Promise<{
+  result: OptimizeResult;
+  retried?: boolean;
+  retryImproved?: boolean;
+}> {
+  const analyzeJson = JSON.stringify(
+    {
+      jdAnalysis: analyze.jdAnalysis,
+      matchReport: analyze.matchReport,
+    },
+    null,
+    2,
+  );
+
+  const rewriteSystem = buildRewriteSystemPrompt(variantId);
+  const rewriteUser = buildRewriteUserPrompt(resume, jd, analyzeJson, focus);
+
+  const firstRewrite = await parseFromLlm(
+    optimizeRewriteSchema,
+    rewriteSystem,
+    rewriteUser,
+    temperature,
+  );
+  let result = mergeOptimizeResult(analyze, firstRewrite);
+  const firstAudit = auditOptimizeEvidence(resume, result);
+
+  if (!firstAudit.hasFabricationRisk) {
+    return { result };
+  }
+
+  const correctionPrompt = buildRewriteFabricationCorrectionPrompt(
+    rewriteUser,
+    firstAudit,
+  );
+  const retryRewrite = await parseFromLlm(
+    optimizeRewriteSchema,
+    rewriteSystem,
+    correctionPrompt,
+    Math.min(temperature, 0.2),
+  );
+
+  const retryResult = mergeOptimizeResult(analyze, retryRewrite);
+  const retryAudit = auditOptimizeEvidence(resume, retryResult);
+  const retryImproved =
+    fabricationSeverity(retryAudit) < fabricationSeverity(firstAudit);
+
+  return {
+    result: retryImproved ? retryResult : result,
+    retried: true,
+    retryImproved,
+  };
+}
 
 export async function optimizeResume(
   resume: string,
   jd: string,
   options?: OptimizeOptions | string,
 ): Promise<OptimizeResult> {
-  const focus = typeof options === "string" ? options : options?.focus;
-  const promptVariant =
-    typeof options === "string" ? undefined : options?.promptVariant;
+  const opts = typeof options === "string" ? { focus: options } : options;
+  const focus = opts?.focus;
+  const promptVariant = opts?.promptVariant;
+  const onProgress = opts?.onProgress;
 
   const variant = getPromptVariant(promptVariant);
-  const userPrompt = variant.buildUserPrompt(resume, jd, focus);
-  let lastError: Error | null = null;
+  const variantId = variant.id;
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const raw = await callLlm(
-        variant.systemPrompt,
-        attempt === 0
-          ? userPrompt
-          : `${userPrompt}\n\n上次返回的 JSON 格式有误，请严格输出合法 JSON，不要包含任何额外文字。`,
-        variant.temperature,
-      );
-      const parsed = JSON.parse(extractJson(raw));
-      return optimizeResultSchema.parse(parsed);
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-    }
+  const emit = (step: OptimizeProgressStep) => {
+    onProgress?.(step);
+  };
+
+  emit("analyze");
+  const analyze = await parseFromLlm(
+    optimizeAnalyzeSchema,
+    buildAnalyzeSystemPrompt(variantId),
+    buildAnalyzeUserPrompt(resume, jd, focus),
+    variant.temperature,
+  );
+
+  emit("rewrite");
+  const { result, retried, retryImproved } = await runRewriteWithRetry(
+    resume,
+    jd,
+    analyze,
+    variantId,
+    variant.temperature,
+    focus,
+  );
+
+  emit("audit");
+  return applySanitizeIfNeeded(resume, result, {
+    retried,
+    retryImproved,
+  });
+}
+
+export async function optimizeResumeWithEvents(
+  resume: string,
+  jd: string,
+  options?: OptimizeOptions,
+  onEvent?: (event: OptimizeProgressEvent) => void,
+): Promise<OptimizeResult> {
+  const send = (step: OptimizeProgressStep) => {
+    onEvent?.({
+      type: "progress",
+      step,
+      message: PROGRESS_MESSAGES[step],
+    });
+  };
+
+  try {
+    const result = await optimizeResume(resume, jd, {
+      ...options,
+      onProgress: send,
+    });
+    onEvent?.({ type: "result", data: result });
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    onEvent?.({ type: "error", message });
+    throw error;
   }
-
-  throw lastError ?? new Error("简历优化失败");
 }

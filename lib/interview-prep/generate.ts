@@ -1,4 +1,5 @@
 import { callLlm, extractJson } from "@/lib/llm";
+import { inferPmFlavor } from "./infer-role-type";
 import {
   buildInterviewPrepSystemPrompt,
   buildInterviewPrepUserPrompt,
@@ -51,6 +52,8 @@ export async function generateInterviewPrep(
 ): Promise<InterviewPrepResult> {
   const mode = input.mode ?? "standard";
   const roleType = input.roleType ?? "pm";
+  const pmFlavor =
+    roleType === "pm" ? inferPmFlavor(input.jd, input.roleTitle) : "general";
 
   const emit = (step: string, message: string) => {
     onProgress?.({ type: "progress", step, message });
@@ -91,7 +94,7 @@ export async function generateInterviewPrep(
 
   emit("generate", "正在生成面试准备材料…");
   const result = await parseJsonWithRetry<InterviewPrepResult>(
-    buildInterviewPrepSystemPrompt(mode, roleType, input.modules),
+    buildInterviewPrepSystemPrompt(mode, roleType, input.modules, pmFlavor),
     buildInterviewPrepUserPrompt({
       resume: input.resume,
       jd: input.jd,

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { optimizeResume } from "@/lib/llm";
+import { optimizeResume, optimizeResumeWithEvents } from "@/lib/llm";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { optimizeRequestSchema } from "@/lib/schema";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,14 +31,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await optimizeResume(
-      parsed.data.resume,
-      parsed.data.jd,
-      {
-        focus: parsed.data.focus,
-        promptVariant: parsed.data.promptVariant,
-      },
-    );
+    const input = parsed.data;
+
+    if (input.stream) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          const send = (payload: unknown) => {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(payload)}\n\n`),
+            );
+          };
+
+          try {
+            await optimizeResumeWithEvents(
+              input.resume,
+              input.jd,
+              {
+                focus: input.focus,
+                promptVariant: input.promptVariant,
+              },
+              send,
+            );
+            controller.close();
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "优化失败，请稍后重试";
+            send({ type: "error", message });
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          "X-RateLimit-Remaining": String(remaining),
+        },
+      });
+    }
+
+    const result = await optimizeResume(input.resume, input.jd, {
+      focus: input.focus,
+      promptVariant: input.promptVariant,
+    });
 
     return NextResponse.json(result, {
       headers: { "X-RateLimit-Remaining": String(remaining) },

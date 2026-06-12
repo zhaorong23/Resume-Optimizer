@@ -44,5 +44,8 @@ next-env.d.ts
 # prompt compare output
 /scripts/output/
 
+# generated eval sample packs (run eval:generate locally)
+/public/eval-samples/*.json
+
 # accidental local tessdata copies
 *.traineddata

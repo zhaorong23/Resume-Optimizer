@@ -72,11 +72,11 @@ export function buildInterviewPrepMarkdown(
     ]),
     "### 2.3 逐条匹配分析",
     "",
-    "| JD 要求 | 简历依据 | 匹配度 | gap / 风险 | 面试策略 |",
-    "|---------|---------|--------|-----------|----------|",
+    "| JD 要求 | 简历依据 | 匹配度 | 证据边界 | gap / 风险 | 面试策略 |",
+    "|---------|---------|--------|----------|-----------|----------|",
     ...result.jdLineMatches.map(
       (row) =>
-        `| ${row.jdRequirement} | ${row.resumeEvidence} | ${formatMatchLevel(row.matchLevel)} | ${row.gapOrRisk} | ${row.interviewStrategy} |`,
+        `| ${row.jdRequirement} | ${row.resumeEvidence} | ${formatMatchLevel(row.matchLevel)} | ${row.evidenceBoundary ?? "—"} | ${row.gapOrRisk} | ${row.interviewStrategy} |`,
     ),
     "",
     "## 三、定制版自我介绍",
@@ -106,13 +106,21 @@ export function buildInterviewPrepMarkdown(
   lines.push(
     "## 五、高频面试问题",
     "",
-    ...result.commonQuestions.flatMap((q) => [
-      `### ${q.question}`,
-      `> 来源：${q.source}${q.examiningPoint ? ` · 考察：${q.examiningPoint}` : ""}`,
-      "",
-      q.referenceAnswer,
-      "",
-    ]),
+    ...result.commonQuestions.flatMap((q) => {
+      const header = [
+        `### ${q.question}`,
+        `> 来源：${q.source}${q.examiningPoint ? ` · 考察：${q.examiningPoint}` : ""}`,
+        "",
+      ];
+      if (q.passAnswer || q.strongAnswer) {
+        return [
+          ...header,
+          ...(q.passAnswer ? [`**及格答法**：${q.passAnswer}`, ""] : []),
+          ...(q.strongAnswer ? [`**加分答法**：${q.strongAnswer}`, ""] : []),
+        ];
+      }
+      return [...header, q.referenceAnswer, ""];
+    }),
     "## 六、产品设计思考",
     "",
     "### 亮点观察",
@@ -134,19 +142,22 @@ export function buildInterviewPrepMarkdown(
     "### 优先级 1 — 必须补",
     "",
     ...result.gapChecklist.priority1.map(
-      (item) => `- [ ] ${item.content} → ${item.action}`,
+      (item) =>
+        `- [ ] ${item.content} → ${item.action}${item.evidenceBoundary ? ` · ${item.evidenceBoundary}` : ""}`,
     ),
     "",
     "### 优先级 2 — 争取补",
     "",
     ...result.gapChecklist.priority2.map(
-      (item) => `- [ ] ${item.content} → ${item.action}`,
+      (item) =>
+        `- [ ] ${item.content} → ${item.action}${item.evidenceBoundary ? ` · ${item.evidenceBoundary}` : ""}`,
     ),
     "",
     "### 优先级 3 — 了解即可",
     "",
     ...result.gapChecklist.priority3.map(
-      (item) => `- [ ] ${item.content} → ${item.action}`,
+      (item) =>
+        `- [ ] ${item.content} → ${item.action}${item.evidenceBoundary ? ` · ${item.evidenceBoundary}` : ""}`,
     ),
     "",
     "## 来源链接",
