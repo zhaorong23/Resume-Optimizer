@@ -1,3 +1,4 @@
+import { ZodError } from "zod";
 import { callLlm, extractJson } from "@/lib/llm";
 import { inferPmFlavor } from "./infer-role-type";
 import {
@@ -18,32 +19,70 @@ import {
   type InterviewPrepResult,
   type ResearchBrief,
 } from "./schema";
+import {
+  normalizeInterviewPrepPayload,
+  normalizeResearchBriefPayload,
+} from "./normalize";
+
+function formatZodRetryHint(error: ZodError): string {
+  const details = error.issues
+    .slice(0, 5)
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join(".") : "根对象";
+      return `- 字段 ${path}：${issue.message}`;
+    })
+    .join("\n");
+  return `上次 JSON 未通过校验，请修正以下字段后重新输出合法 JSON（不要 markdown 代码块）：\n${details}`;
+}
+
+function toUserFacingParseError(error: Error): Error {
+  if (error instanceof ZodError) {
+    return new Error("生成结果格式异常，请重试；若仍失败可稍后再试。");
+  }
+  if (error.message.includes("JSON")) {
+    return new Error("模型返回格式异常，请重试。");
+  }
+  return error;
+}
 
 async function parseJsonWithRetry<T>(
   systemPrompt: string,
   userPrompt: string,
   schema: { parse: (data: unknown) => T },
   temperature: number,
+  normalize?: (data: unknown) => unknown,
+  maxAttempts = 3,
 ): Promise<T> {
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const raw = await callLlm(
         systemPrompt,
         attempt === 0
           ? userPrompt
-          : `${userPrompt}\n\n上次返回的 JSON 格式有误，请严格输出合法 JSON，不要包含任何额外文字。`,
+          : `${userPrompt}\n\n${
+              lastError instanceof ZodError
+                ? formatZodRetryHint(lastError)
+                : "上次返回的 JSON 格式有误，请严格输出合法 JSON，不要包含任何额外文字。"
+            }`,
         temperature,
       );
       const parsed = JSON.parse(extractJson(raw));
-      return schema.parse(parsed);
+      const normalized = normalize ? normalize(parsed) : parsed;
+      return schema.parse(normalized);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+      if (lastError instanceof ZodError) {
+        console.error(
+          "[interview-prep] schema validation failed:",
+          JSON.stringify(lastError.issues),
+        );
+      }
     }
   }
 
-  throw lastError ?? new Error("JSON 解析失败");
+  throw toUserFacingParseError(lastError ?? new Error("JSON 解析失败"));
 }
 
 export async function generateInterviewPrep(
@@ -90,6 +129,7 @@ export async function generateInterviewPrep(
     }),
     researchBriefSchema,
     0.3,
+    normalizeResearchBriefPayload,
   );
 
   emit("generate", "正在生成面试准备材料…");
@@ -108,6 +148,7 @@ export async function generateInterviewPrep(
     }),
     interviewPrepResultSchema,
     0.4,
+    normalizeInterviewPrepPayload,
   );
 
   const withMeta: InterviewPrepResult = {

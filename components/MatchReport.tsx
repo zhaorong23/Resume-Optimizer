@@ -1,6 +1,5 @@
 "use client";
 
-import { EvidenceBoundaryBadge } from "@/components/EvidenceBoundaryBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { MatchReport } from "@/lib/schema";
 
@@ -37,10 +36,7 @@ export function MatchReportCard({ report }: MatchReportProps) {
                 <li key={gap.content} className="flex gap-2">
                   <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
                   <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span>{gap.content}</span>
-                      <EvidenceBoundaryBadge boundary={gap.evidenceBoundary} />
-                    </div>
+                    <span>{gap.content}</span>
                     {gap.suggestion ? (
                       <p className="text-xs text-muted">{gap.suggestion}</p>
                     ) : null}

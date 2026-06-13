@@ -68,9 +68,9 @@ const INTERVIEW_PREP_JSON_SCHEMA = `{
 }`;
 
 const RESEARCH_BRIEF_SCHEMA = `{
-  "companyOverview": "公司定位与规模",
-  "productPositioning": "产品定位",
-  "interviewStyleSummary": "面经风格 3-5 句",
+  "companyOverview": "公司定位与规模（单个字符串，不要用数组）",
+  "productPositioning": "产品定位（单个字符串，不要用数组）",
+  "interviewStyleSummary": "面经风格一段话，多句用分号连接（必须是 string，禁止 array）",
   "keyFacts": ["关键事实"],
   "competitorNames": ["主要竞品"]
 }`;
@@ -139,6 +139,8 @@ export function buildResearchBriefSystemPrompt(): string {
 1. 只使用提供的搜索摘要，不得捏造融资额、用户数等具体数字
 2. 无法从摘要确认的信息不要写入
 3. 输出合法 JSON，不要 markdown 代码块
+4. companyOverview、productPositioning、interviewStyleSummary 必须是单个 JSON 字符串；多句用中文分号连接；禁止用数组。keyFacts 与 competitorNames 才是数组
+5. 若搜索摘要为列表，请合并为段落后再写入上述三个字符串字段
 
 输出结构：
 ${RESEARCH_BRIEF_SCHEMA}`;

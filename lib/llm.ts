@@ -1,3 +1,4 @@
+import { inferRoleTypeFromJd } from "./interview-prep/infer-role-type";
 import {
   buildAnalyzeSystemPrompt,
   buildAnalyzeUserPrompt,
@@ -149,6 +150,7 @@ async function runRewriteWithRetry(
   jd: string,
   analyze: OptimizeAnalyzeResult,
   variantId: string,
+  roleType: ReturnType<typeof inferRoleTypeFromJd>,
   temperature: number,
   focus?: string,
 ): Promise<{
@@ -165,7 +167,7 @@ async function runRewriteWithRetry(
     2,
   );
 
-  const rewriteSystem = buildRewriteSystemPrompt(variantId);
+  const rewriteSystem = buildRewriteSystemPrompt(variantId, roleType);
   const rewriteUser = buildRewriteUserPrompt(resume, jd, analyzeJson, focus);
 
   const firstRewrite = await parseFromLlm(
@@ -216,6 +218,7 @@ export async function optimizeResume(
 
   const variant = getPromptVariant(promptVariant);
   const variantId = variant.id;
+  const roleType = inferRoleTypeFromJd(jd);
 
   const emit = (step: OptimizeProgressStep) => {
     onProgress?.(step);
@@ -224,7 +227,7 @@ export async function optimizeResume(
   emit("analyze");
   const analyze = await parseFromLlm(
     optimizeAnalyzeSchema,
-    buildAnalyzeSystemPrompt(variantId),
+    buildAnalyzeSystemPrompt(variantId, roleType),
     buildAnalyzeUserPrompt(resume, jd, focus),
     variant.temperature,
   );
@@ -235,6 +238,7 @@ export async function optimizeResume(
     jd,
     analyze,
     variantId,
+    roleType,
     variant.temperature,
     focus,
   );

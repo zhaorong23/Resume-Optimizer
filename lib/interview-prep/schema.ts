@@ -1,6 +1,20 @@
 import { z } from "zod";
-import { evidenceBoundarySchema } from "@/lib/evidence-boundary";
 import { optimizeResultSchema } from "@/lib/schema";
+import {
+  matchLevelSchema,
+  prepModeCoercedSchema,
+  questionSourceSchema,
+  relaxedEvidenceBoundarySchema,
+} from "./normalize";
+
+/** LLM 常把「多句段落」输出为 string[]，统一合并为单个字符串 */
+export const coercedString = z
+  .union([z.string(), z.array(z.string())])
+  .transform((value) =>
+    Array.isArray(value)
+      ? value.map((part) => part.trim()).filter(Boolean).join("；")
+      : value.trim(),
+  );
 
 export const roleTypeSchema = z.enum(["pm", "ops"]);
 export const interviewRoundSchema = z.enum(["hr", "biz", "final", "all"]);
@@ -21,7 +35,7 @@ export const sourceSchema = z.object({
 });
 
 export const companyResearchSchema = z.object({
-  overview: z.string(),
+  overview: coercedString,
   background: z.array(
     z.object({ label: z.string(), value: z.string() }),
   ),
@@ -30,7 +44,7 @@ export const companyResearchSchema = z.object({
     z.object({ name: z.string(), comparison: z.string() }),
   ),
   teamCulture: z.array(z.string()),
-  interviewStyle: z.string(),
+  interviewStyle: coercedString,
   hotTopics: z.array(
     z.object({
       title: z.string(),
@@ -43,8 +57,8 @@ export const companyResearchSchema = z.object({
 export const jdLineMatchSchema = z.object({
   jdRequirement: z.string(),
   resumeEvidence: z.string(),
-  matchLevel: z.enum(["strong", "medium", "weak", "unknown"]),
-  evidenceBoundary: evidenceBoundarySchema.optional(),
+  matchLevel: matchLevelSchema,
+  evidenceBoundary: relaxedEvidenceBoundarySchema,
   gapOrRisk: z.string(),
   interviewStrategy: z.string(),
 });
@@ -70,20 +84,20 @@ export const interviewQuestionSchema = z.object({
   referenceAnswer: z.string(),
   passAnswer: z.string().optional(),
   strongAnswer: z.string().optional(),
-  source: z.enum(["面经", "专项", "通用"]),
+  source: questionSourceSchema,
   examiningPoint: z.string().optional(),
 });
 
 export const gapItemSchema = z.object({
   content: z.string(),
   action: z.string(),
-  evidenceBoundary: evidenceBoundarySchema.optional(),
+  evidenceBoundary: relaxedEvidenceBoundarySchema,
 });
 
 export const interviewPrepResultSchema = z.object({
-  jdOriginal: z.string(),
+  jdOriginal: coercedString,
   companyResearch: companyResearchSchema,
-  jdIntent: z.string(),
+  jdIntent: coercedString,
   responsibilityInterpretations: z.array(
     z.object({
       original: z.string(),
@@ -91,7 +105,7 @@ export const interviewPrepResultSchema = z.object({
     }),
   ),
   jdLineMatches: z.array(jdLineMatchSchema),
-  selfIntro: z.string(),
+  selfIntro: coercedString,
   projectDeepDives: z.array(projectDeepDiveSchema),
   commonQuestions: z.array(interviewQuestionSchema),
   designObservations: z.object({
@@ -107,15 +121,15 @@ export const interviewPrepResultSchema = z.object({
     priority3: z.array(gapItemSchema),
   }),
   sources: z.array(sourceSchema),
-  mode: prepModeSchema,
+  mode: prepModeCoercedSchema,
   searchFailed: z.boolean().optional(),
-  disclaimer: z.string(),
+  disclaimer: coercedString,
 });
 
 export const researchBriefSchema = z.object({
-  companyOverview: z.string(),
-  productPositioning: z.string(),
-  interviewStyleSummary: z.string(),
+  companyOverview: coercedString,
+  productPositioning: coercedString,
+  interviewStyleSummary: coercedString,
   keyFacts: z.array(z.string()),
   competitorNames: z.array(z.string()),
 });

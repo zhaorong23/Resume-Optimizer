@@ -15,20 +15,28 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { evidenceBoundarySchema } from "../lib/evidence-boundary";
-import { inferPmFlavor } from "../lib/interview-prep/infer-role-type";
+import {
+  inferPmFlavor,
+  inferRoleTypeFromJd,
+} from "../lib/interview-prep/infer-role-type";
+import { buildAnalyzeSystemPrompt } from "../lib/prompts";
 import { loadRoleTypesExcerpt } from "../lib/interview-prep/prompts";
 import {
   gapItemSchema,
   interviewQuestionSchema,
+  researchBriefSchema,
   roleTypeSchema,
 } from "../lib/interview-prep/schema";
+import { normalizeResearchBriefPayload } from "../lib/interview-prep/normalize";
 import { gapDetailSchema } from "../lib/schema";
 import {
   GOLDEN_FIXTURES,
   OPS_EVAL_FIXTURES,
   OPT_OPS_A_QIJI,
   OPT_PM_A_JDONG,
+  OPS_JD_QIJI,
   PM_EVAL_FIXTURES,
+  PM_JD_JDONG,
   WEAK_FIXTURE_SMOKE_IDS,
 } from "../lib/fixtures";
 import { scoreOptimize } from "./lib/rubric";
@@ -443,6 +451,35 @@ const tests: TestCase[] = [
     },
   },
   {
+    id: "S-18",
+    title: "Analyze 双视角角色与 JD 赛道推断",
+    run: () => {
+      assert(
+        inferRoleTypeFromJd(OPS_JD_QIJI) === "ops",
+        "运营 JD 应推断为 ops",
+      );
+      assert(
+        inferRoleTypeFromJd(PM_JD_JDONG) === "pm",
+        "产品经理 JD 应推断为 pm",
+      );
+
+      const opsAnalyze = buildAnalyzeSystemPrompt("baseline", "ops");
+      assert(opsAnalyze.includes("资深产品运营"), "运营 analyze 应含资深产品运营");
+      assert(opsAnalyze.includes("招聘官视角"), "analyze 应含招聘官视角");
+      assert(opsAnalyze.includes("从业者视角"), "analyze 应含从业者视角");
+      assert(opsAnalyze.includes("事实审计视角"), "analyze 应含事实审计视角");
+
+      const pmAnalyze = buildAnalyzeSystemPrompt("baseline", "pm");
+      assert(pmAnalyze.includes("资深产品经理"), "PM analyze 应含资深产品经理");
+      assert(!pmAnalyze.includes("资深 HR"), "analyze 不应再使用纯 HR 角色");
+
+      assert(
+        readProjectFile("lib/llm.ts").includes("inferRoleTypeFromJd"),
+        "llm 应接入 JD 赛道推断",
+      );
+    },
+  },
+  {
     id: "S-11",
     title: "answer-quality schema 支持及格/加分答法",
     run: () => {
@@ -547,6 +584,45 @@ const tests: TestCase[] = [
       assert(comparisons.length === 1, "应生成 1 条比对");
       const summary = summarizeCalibration(comparisons, "test-batch");
       assert(summary.sampleCount === 1, "summary 样本数应为 1");
+    },
+  },
+  {
+    id: "S-19",
+    title: "researchBrief 支持 interviewStyleSummary 数组容错",
+    run: () => {
+      const parsed = researchBriefSchema.parse({
+        companyOverview: "智谱 AI 是一家大模型公司",
+        productPositioning: "ToB 大模型平台",
+        interviewStyleSummary: ["偏业务面", "会深挖项目", "重视数据"],
+        keyFacts: ["融资 B 轮"],
+        competitorNames: ["百度", "阿里"],
+      });
+      assert(
+        parsed.interviewStyleSummary === "偏业务面；会深挖项目；重视数据",
+        "数组应合并为分号连接的字符串",
+      );
+      const normalized = researchBriefSchema.parse(
+        normalizeResearchBriefPayload({
+          companyOverview: ["A", "B"],
+          productPositioning: "定位",
+          interviewStyleSummary: ["面经1", "面经2"],
+          keyFacts: "事实1；事实2",
+          competitorNames: "竞品A",
+        }),
+      );
+      assert(normalized.companyOverview === "A；B", "overview 数组应合并");
+      assert(normalized.keyFacts.join("、") === "事实1、事实2", "keyFacts 字符串应切分");
+      const fromString = researchBriefSchema.parse({
+        companyOverview: "概述",
+        productPositioning: "定位",
+        interviewStyleSummary: "  单段面经风格  ",
+        keyFacts: [],
+        competitorNames: [],
+      });
+      assert(
+        fromString.interviewStyleSummary === "单段面经风格",
+        "字符串输入应 trim",
+      );
     },
   },
   {

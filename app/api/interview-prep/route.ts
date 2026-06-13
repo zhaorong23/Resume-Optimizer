@@ -29,7 +29,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const parsed = interviewPrepRequestSchema.safeParse(body);
+    const sanitizedBody =
+      body && typeof body === "object" && body.optimizeResult
+        ? {
+            ...body,
+            optimizeResult: (() => {
+              const { evidenceAudit: _audit, ...rest } = body.optimizeResult as Record<
+                string,
+                unknown
+              >;
+              return rest;
+            })(),
+          }
+        : body;
+    const parsed = interviewPrepRequestSchema.safeParse(sanitizedBody);
 
     if (!parsed.success) {
       return NextResponse.json(

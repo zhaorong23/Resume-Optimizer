@@ -4,6 +4,7 @@ import {
   TRUTH_BOUNDARY_PROMPT_RULE,
 } from "./evidence-boundary";
 import { buildMetricWhitelistBlock } from "./evidence-sanitize";
+import type { OptimizeRoleType } from "./interview-prep/infer-role-type";
 
 const JSON_OUTPUT_SCHEMA = `{
   "jdAnalysis": {
@@ -84,9 +85,15 @@ ${resume}${focusLine}
 ${REWRITE_SELF_CHECK}`;
 }
 
-const BASE_ROLE = `你是资深 HR 与简历顾问，擅长根据目标岗位 JD 优化中文简历。
+function buildBaseRole(roleType: OptimizeRoleType = "pm"): string {
+  const trackLabel =
+    roleType === "ops" ? "资深产品运营" : "资深产品经理";
+  return `你是${trackLabel}，并有业务线招聘与简历辅导经验，擅长根据目标岗位 JD 优化中文简历。
 你的首要职责是**保护用户诚信**：宁可改写平淡、篇幅变短，也绝不可捏造数字、项目或能力。
 分析层（jdAnalysis、matchReport）可以诚实指出缺口；事实层（sections.rewritten）只能重组用户已提供的信息。`;
+}
+
+const BASE_ROLE = buildBaseRole("pm");
 
 export const PROMPT_VARIANTS: Record<string, PromptVariant> = {
   baseline: {
@@ -257,19 +264,45 @@ const VARIANT_REWRITE_HINTS: Record<string, string> = {
     "2-3 句职业故事 + 项目叙述，禁止为完整性补数据或工具",
 };
 
-const ANALYZE_ROLE = `你是资深 HR 顾问。本步骤只做 JD 解读与简历匹配分析，**不要**输出 sections 改写。
+const TRACK_ANALYZE_FOCUS: Record<OptimizeRoleType, string> = {
+  pm: "需求定义、功能落地、跨团队协作、产品迭代",
+  ops: "活动复盘、用户分层、指标表达、活动策划与执行",
+};
+
+function buildAnalyzeRole(roleType: OptimizeRoleType): string {
+  const trackLabel =
+    roleType === "ops" ? "资深产品运营" : "资深产品经理";
+  const trackFocus = TRACK_ANALYZE_FOCUS[roleType];
+
+  return `你是${trackLabel}，并有业务线招聘与简历初筛经验。本步骤只做 JD 解读与简历匹配分析，**不要**输出 sections 改写。
+
+双视角分工（必须遵守）：
+1. **从业者视角**：解读 JD（${trackFocus}）；判断简历经历是否构成有效证据；撰写 gapDetails.content 与 suggestion（具体、可执行）
+2. **招聘官视角**：matchScore 反映初筛通过率；硬条件不满足或弱匹配（经历与 JD 层级/深度明显不符）应给低分，勿因「有相关词」虚高
+3. **事实审计视角**：evidenceBoundary 仅依据简历原文；无证据一律「不能写」，不因行业惯例放宽
+
 诚实标注缺口；无简历证据的能力标 evidenceBoundary 为「不能写」。`;
+}
 
-const REWRITE_ROLE = `你是保守的简历事实编辑。本步骤**只**输出 sections 改写，不得修改 matchScore 或新增 gap。
-宁可篇幅变短，不可捏造数字、项目或能力。`;
+function buildRewriteRole(roleType: OptimizeRoleType): string {
+  const trackLabel =
+    roleType === "ops" ? "资深产品运营" : "资深产品经理";
+  const trackFocus = TRACK_ANALYZE_FOCUS[roleType];
 
-export function buildAnalyzeSystemPrompt(variantId?: string): string {
+  return `你是${trackLabel}，同时担任保守的简历事实编辑。本步骤**只**输出 sections 改写，不得修改 matchScore 或新增 gap。
+用本赛道语言（${trackFocus}）重组**原文已有**信息；首要职责仍是保护诚信：宁可篇幅变短，不可捏造数字、项目或能力。`;
+}
+
+export function buildAnalyzeSystemPrompt(
+  variantId?: string,
+  roleType: OptimizeRoleType = "pm",
+): string {
   const keywordNote =
     variantId === "keyword-ats"
       ? '\n在 matchReport 中增加 "keywordCoverage" 字段（0-100），仅统计简历已有经历对 JD 关键词的覆盖。'
       : "";
 
-  return `${ANALYZE_ROLE}
+  return `${buildAnalyzeRole(roleType)}
 
 ${TRUTH_BOUNDARY_PROMPT_RULE}
 
@@ -297,11 +330,20 @@ ${resume}${focusLine}
 要求：matchReport.gapDetails 须为每条主要缺口标注 evidenceBoundary。`;
 }
 
-export function buildRewriteSystemPrompt(variantId?: string): string {
+export function buildRewriteSystemPrompt(
+  variantId?: string,
+  roleType: OptimizeRoleType = "pm",
+): string {
   const id = variantId ?? DEFAULT_PROMPT_VARIANT;
   const hint = VARIANT_REWRITE_HINTS[id] ?? VARIANT_REWRITE_HINTS.baseline;
+  const trackRule =
+    roleType === "ops"
+      ? "运营岗改写侧重活动复盘、指标表述（仅限原文已有数字）、执行与协作"
+      : "产品经理岗改写侧重需求定义、功能落地、跨团队协作";
 
-  return `${REWRITE_ROLE}
+  return `${buildRewriteRole(roleType)}
+
+赛道侧重：${trackRule}
 
 改写策略（${id}）：${hint}
 

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EvidenceBoundaryBadge } from "@/components/EvidenceBoundaryBadge";
 import { InterviewPrepExportBar } from "@/components/InterviewPrepExportBar";
 import { formatMatchLevel } from "@/lib/interview-prep/format";
 import {
@@ -90,13 +89,8 @@ export function InterviewPrepPanel({
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-amber-900">
             {result.gapChecklist.priority1.map((item) => (
-              <p key={item.content} className="flex flex-wrap items-center gap-2">
-                <span>
-                  • {item.content} → {item.action}
-                </span>
-                {item.evidenceBoundary ? (
-                  <EvidenceBoundaryBadge boundary={item.evidenceBoundary} />
-                ) : null}
+              <p key={item.content}>
+                • {item.content} → {item.action}
               </p>
             ))}
           </CardContent>
@@ -139,7 +133,6 @@ export function InterviewPrepPanel({
                   <th className="py-2 pr-3">JD 要求</th>
                   <th className="py-2 pr-3">简历依据</th>
                   <th className="py-2 pr-3">匹配</th>
-                  <th className="py-2 pr-3">证据边界</th>
                   <th className="py-2">面试策略</th>
                 </tr>
               </thead>
@@ -153,13 +146,6 @@ export function InterviewPrepPanel({
                     <td className="py-2 pr-3">{row.resumeEvidence}</td>
                     <td className="py-2 pr-3">
                       {formatMatchLevel(row.matchLevel)}
-                    </td>
-                    <td className="py-2 pr-3">
-                      {row.evidenceBoundary ? (
-                        <EvidenceBoundaryBadge boundary={row.evidenceBoundary} />
-                      ) : (
-                        "—"
-                      )}
                     </td>
                     <td className="py-2">{row.interviewStrategy}</td>
                   </tr>
@@ -292,13 +278,8 @@ function GapGroup({
       <p className={cn("mb-2 text-sm font-medium text-foreground")}>{title}</p>
       <ul className="space-y-2 text-sm text-muted">
         {items.map((item) => (
-          <li key={item.content} className="flex flex-wrap items-center gap-2">
-            <span>
-              • {item.content} → {item.action}
-            </span>
-            {item.evidenceBoundary ? (
-              <EvidenceBoundaryBadge boundary={item.evidenceBoundary} />
-            ) : null}
+          <li key={item.content}>
+            • {item.content} → {item.action}
           </li>
         ))}
       </ul>
